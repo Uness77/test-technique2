@@ -1,7 +1,7 @@
-import {Component, OnInit} from '@angular/core';
+import {Component, OnDestroy, OnInit} from '@angular/core';
 import {FormControl, FormGroup, Validators} from "@angular/forms";
 import {OpenWeatherService} from "./services/open-weather.service";
-import {Observable, of, tap} from "rxjs";
+import {catchError, finalize, of, Subscription, tap} from "rxjs";
 import {WeatherDataModel} from "./model/weather-data.model";
 
 @Component({
@@ -9,38 +9,40 @@ import {WeatherDataModel} from "./model/weather-data.model";
   templateUrl: './open-weather.component.html',
   styleUrl: './open-weather.component.scss'
 })
-export class OpenWeatherComponent implements OnInit{
+export class OpenWeatherComponent implements OnDestroy {
 
-  // public weatherForm: FormGroup;
-  // public weatherData: WeatherDataModel;
+  public weatherSearchForm: FormGroup;
+  public weatherData: WeatherDataModel;
+  public loadingWeatherData: boolean;
+  private subscription: Subscription | undefined;
 
-   weatherData$:Observable<any> = of(null);
-
-  constructor(private openWeatherService : OpenWeatherService) {
-  }
-
-  ngOnInit() {
+  constructor(private openWeatherService: OpenWeatherService) {
     this.initializeWeaherForm();
-    this.weatherData$ = this.openWeatherService.fetchWeatherDataByCityName('paris');
   }
-
 
   private initializeWeaherForm() {
-    // this.weatherForm =  new FormGroup({
-    //   city: new FormControl('', Validators.required)
-    // })
+    this.weatherSearchForm = new FormGroup({
+      city: new FormControl('', Validators.required)
+    });
   }
 
   fecthWeatherData() {
-    // const cityValue = this.weatherForm.get('city')?.value;
-    // if(cityValue){
-    //   this.openWeatherService.fetchWeatherDataByCityName(cityValue).pipe(
-    //     tap((weatherData) => {
-    //       this.weatherData =  weatherData;
-    //     })
-    //   )
-    // }
+    const cityValue = this.weatherSearchForm?.get('city')?.value;
+    if (cityValue) {
+      this.loadingWeatherData = true;
+      this.subscription = this.openWeatherService.fetchWeatherDataByCityName(cityValue).pipe(
+        tap((weatherData: WeatherDataModel) => {
+          this.weatherData = weatherData;
+        }),
+        finalize(() => this.loadingWeatherData = false),
+        catchError((error) => of(error))
+      ).subscribe();
+    }
+  }
 
-
+  ngOnDestroy() {
+    if (this.subscription) {
+      this.subscription.unsubscribe();
+    }
   }
 }
